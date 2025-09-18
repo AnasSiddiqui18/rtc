@@ -1,28 +1,27 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import useWebSocket from "react-use-websocket";
 
 export function Sender() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
 
-  const { sendMessage, lastJsonMessage } = useWebSocket("ws://localhost:8080", {
+  const { sendMessage } = useWebSocket("ws://localhost:8080", {
     retryOnError: true,
     reconnectAttempts: 5,
+    onMessage: (message) => {
+      const data = JSON.parse(message.data) as Record<string, unknown>;
+      if (!data || !data.event) return;
+
+      const pc = pcRef.current;
+
+      if (data.event === "receiver_answer" && pc && "answer" in data) {
+        pc.setRemoteDescription(data.answer as RTCSessionDescriptionInit);
+      }
+
+      if (pc && data.event === "receiver_candidates" && "candidate" in data) {
+        pc.addIceCandidate(data.candidate as RTCIceCandidateInit);
+      }
+    },
   });
-
-  useEffect(() => {
-    const data = lastJsonMessage as Record<string, unknown>;
-    if (!data || !data.event) return;
-
-    const pc = pcRef.current;
-
-    if (data.event === "receiver_answer" && pc && "answer" in data) {
-      pc.setRemoteDescription(data.answer as RTCSessionDescriptionInit);
-    }
-
-    if (pc && data.event === "receiver_candidates" && "candidate" in data) {
-      pc.addIceCandidate(data.candidate as RTCIceCandidateInit);
-    }
-  }, [lastJsonMessage]);
 
   async function sendStream() {
     try {
@@ -41,6 +40,7 @@ export function Sender() {
         }
       };
 
+      // TODO find the difference between get audio/video tracks and gettracks function
       pc.addTrack(stream.getTracks()[0], stream);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
