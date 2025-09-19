@@ -30,13 +30,13 @@ export function Receiver() {
                 JSON.stringify({
                   event: "receiver_candidates",
                   candidate: event.candidate,
-                })
+                }),
               );
             }
           };
 
           await pc.setRemoteDescription(
-            data.offer as RTCSessionDescriptionInit
+            data.offer as RTCSessionDescriptionInit,
           );
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -45,7 +45,7 @@ export function Receiver() {
             JSON.stringify({
               event: "receiver_answer",
               answer,
-            })
+            }),
           );
         })();
       }

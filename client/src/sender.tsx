@@ -35,7 +35,7 @@ export function Sender() {
             JSON.stringify({
               event: "sender_candidates",
               candidate: event.candidate,
-            })
+            }),
           );
         }
       };

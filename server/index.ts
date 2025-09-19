@@ -1,13 +1,28 @@
-import { WebSocketServer } from "ws";
+import { Socket, Server } from "socket.io";
+import { createServer } from "node:http";
+import express from "express";
+import { UserManager } from "./manager/user-manager";
 
-const wss = new WebSocketServer({ port: 8080 });
+const app = express();
+const server = createServer(app);
 
-wss.on("connection", function connection(ws) {
-  ws.on("message", async function message(_data, isBinary) {
-    wss.clients.forEach(function each(client) {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(_data, { binary: isBinary });
-      }
-    });
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+io.on("connection", (socket: Socket) => {
+  console.log("a user connected ⚡");
+
+  const userManager = new UserManager();
+  userManager.addUsers({ name: `user-${crypto.randomUUID()}`, socket });
+
+  socket.on("disconnect", () => {
+    console.log("user disconnected");
   });
+});
+
+server.listen(3000, () => {
+  console.log("listening on *:3000");
 });
