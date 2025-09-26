@@ -12,17 +12,18 @@ const io = new Server(server, {
   },
 });
 
-io.on("connection", (socket: Socket) => {
-  console.log("a user connected ⚡");
+const userManager = new UserManager();
 
-  const userManager = new UserManager();
-  userManager.addUsers({ name: `user-${crypto.randomUUID()}`, socket });
+io.on("connection", (socket: Socket) => {
+  console.log("a user connected ⚡", socket.id);
+
+  userManager.initHandlers(socket, io);
 
   socket.on("disconnect", () => {
     console.log("user disconnected");
   });
 });
 
-server.listen(3000, () => {
-  console.log("listening on *:3000");
+server.listen(3001, () => {
+  console.log("listening on *:3001");
 });

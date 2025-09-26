@@ -49,7 +49,6 @@ export function CreateRoomDialog({ socket }: CreateRoomDialogProps) {
       return;
     }
 
-    console.log("Room created with values:", values);
     socket.emit("create-room", { name: values.name });
     form.reset();
     setOpen(false);
