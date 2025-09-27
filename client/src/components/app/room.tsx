@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Popover,
   PopoverTrigger,
@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/provider/socket-provider";
+import { Badge } from "@/components/ui/badge";
 
 interface RoomProps {
   room: { name: string | null; id: string | null };
@@ -18,8 +19,26 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const sendingPcRef = useRef<RTCPeerConnection | null>(null);
   const receivingPcRef = useRef<RTCPeerConnection | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<
+    "connecting" | "connected" | "disconnected" | "failed"
+  >("disconnected");
 
   const { socket } = useSocket();
+
+  function updateConnectionStatus(
+    connectionState: RTCPeerConnection["connectionState"],
+  ) {
+    console.log("connection updated", connectionState);
+
+    if (
+      connectionState === "connecting" ||
+      connectionState === "connected" ||
+      connectionState === "disconnected" ||
+      connectionState === "failed"
+    ) {
+      setConnectionStatus(connectionState);
+    }
+  }
 
   useEffect(() => {
     if (!localVideoTrack || !socket || !localVideoRef.current) return;
@@ -34,6 +53,10 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
       console.log("create offer called", localVideoTrack, socket);
 
       const pc = new RTCPeerConnection();
+
+      pc.onconnectionstatechange = () =>
+        updateConnectionStatus(pc.connectionState);
+
       sendingPcRef.current = pc;
 
       pc.onicecandidate = async (e) => {
@@ -58,10 +81,14 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
     });
 
     socket.on("offer", async (sdpOffer: RTCSessionDescriptionInit) => {
-      // this will be called when the second user joins
       console.log("offer received", sdpOffer);
 
       const pc = new RTCPeerConnection();
+
+      pc.onconnectionstatechange = () =>
+        updateConnectionStatus(pc.connectionState);
+
+      receivingPcRef.current = pc;
 
       pc.ontrack = (event) => {
         const { streams } = event;
@@ -80,12 +107,13 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
 
       pc.setRemoteDescription(sdpOffer);
 
-      console.log("adding remote track (receiver)", localVideoTrack);
-
       pc.addTrack(localVideoTrack, stream);
+
+      console.log("creating answer", localVideoTrack);
+
       const answer = await pc.createAnswer();
       pc.setLocalDescription(answer);
-      receivingPcRef.current = pc;
+
       socket.emit("answer", room.id, answer);
 
       pc.onicecandidate = async (e) => {
@@ -148,12 +176,32 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
     <div className="p-4 space-y-4">
       <h3 className="text-white capitalize font-bold">{room.name}</h3>
 
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-sm font-medium">
+            Handshake status
+          </span>
+          <Badge
+            variant="default"
+            className={
+              connectionStatus === "connected"
+                ? "bg-green-600/20 text-green-500"
+                : connectionStatus === "connecting"
+                  ? "bg-yellow-600/20 text-yellow-500"
+                  : connectionStatus === "failed"
+                    ? "bg-red-600/20 text-red-500"
+                    : "bg-gray-600 text-white"
+            }
+          >
+            {connectionStatus}
+          </Badge>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         {/* local video */}
-
         <div className="flex flex-col gap-2">
           <h3 className="text-white capitalize font-bold text-3xl">local</h3>
-
           <video
             ref={localVideoRef}
             autoPlay
@@ -163,11 +211,9 @@ export function Room({ room, localVideoTrack, members }: RoomProps) {
           />
         </div>
 
-        {/* remote  video */}
-
+        {/* remote video */}
         <div className="flex flex-col gap-2">
           <h3 className="text-white capitalize font-bold text-3xl">remote</h3>
-
           <video
             ref={remoteVideoRef}
             autoPlay
